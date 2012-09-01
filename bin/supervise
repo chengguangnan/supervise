@@ -1,0 +1,102 @@
+#!/usr/bin/env ruby
+# coding: utf-8
+
+require 'rainbow'
+require 'trollop'
+require 'open3'
+
+VERSION = '1.0'
+
+app = File.basename(__FILE__)
+
+
+p = Trollop::Parser.new do
+  version "#{__FILE__} #{VERSION}"
+
+  banner <<-EOS
+  #{app.upcase} ensures that all your commands are well exectued.
+  
+  Usage:
+    
+      #{app} [options] <filename>
+      cat <filename> | #{app} [options]
+    
+  where [options] are:
+  
+  EOS
+  
+  opt :retry, 'Retry this number of times before giving up', :default => 3
+  opt :retry_delay, '<seconds>', :default => 0, :short => :d
+  opt :verbose
+end
+
+commands = []
+
+@opts = Trollop::with_standard_exception_handling p do
+  
+  raise Trollop::HelpNeeded if ARGV.empty? and STDIN.tty?
+  
+  commands = STDIN
+
+  if ARGV.size == 1
+    input = ARGV.first
+    begin
+      commands = IO.readlines(ARGV.first)
+    rescue
+      abort "No such file #{input}."
+    end
+  end
+  
+  p.parse ARGV
+
+end
+
+aborted_commands = []
+STDOUT.sync = true
+
+num_commands = 0
+num_success  = 0
+
+commands.each do |cmd|
+  
+  cmd.chomp!
+
+  next if cmd.strip.empty?
+
+  num_commands += 1
+  
+  tries = 0
+  begin
+  
+    tries += 1    
+    Open3.capture2e(cmd)
+    
+    if $?
+      num_success  += 1
+      print '✔'.color(:green)
+    else
+      raise
+    end
+    
+  rescue
+    
+    print '•'.color(:red)
+
+    if tries < @opts[:retry]
+      sleep @opts[:retry_delay]
+      retry
+    else
+      print '✘'.color(:red)
+      aborted_commands << cmd
+    end
+    
+  end
+
+end
+
+puts
+
+if not aborted_commands.empty?
+  warn "I supervised #{num_commands} commands, with #{@opts[:retry]} opportunities each, passed #{num_success} and given up #{aborted_commands.size}. The given ups are saved in supervise.log."
+  File.open('supervise.log', 'w') {|f| f.puts aborted_commands.map {|line| "  #{line}" }.join("\n") }
+end
