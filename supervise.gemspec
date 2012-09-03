@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
   
   s.authors = ['Guangnan Cheng']
   
-  s.version = '1.0'
+  s.version = '1.1'
   s.email   = 'me@chengguangnan.com'
   s.homepage = 'https://github.com/guangnan/supervise'
 
